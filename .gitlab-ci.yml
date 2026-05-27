@@ -1,0 +1,73 @@
+stages:
+  - test
+  - build
+  - package
+  - performance
+  - deploy
+
+variables:
+  NODE_ENV: test
+  DOCKER_IMAGE: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+
+cache:
+  key:
+    files:
+      - package-lock.json
+  paths:
+    - .npm/
+
+unit_tests:
+  image: node:20-alpine
+  stage: test
+  before_script:
+    - npm ci --cache .npm --prefer-offline
+  script:
+    - npm run test
+
+frontend_build:
+  image: node:20-alpine
+  stage: build
+  before_script:
+    - npm ci --cache .npm --prefer-offline
+  script:
+    - npm run build
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - dist/
+
+docker_image:
+  image: docker:25.0
+  stage: package
+  services:
+    - docker:25.0-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  needs:
+    - frontend_build
+  rules:
+    - if: $CI_REGISTRY_IMAGE
+  script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - docker build --build-arg VITE_GOOGLE_MAPS_API_KEY="$VITE_GOOGLE_MAPS_API_KEY" -t "$DOCKER_IMAGE" .
+    - docker push "$DOCKER_IMAGE"
+
+performance_smoke:
+  image: node:20-alpine
+  stage: performance
+  before_script:
+    - npm ci --cache .npm --prefer-offline
+    - npm run build
+  script:
+    - npm run perf
+
+deploy_production:
+  image: alpine:3.20
+  stage: deploy
+  when: manual
+  environment:
+    name: production
+    url: https://$DOMAIN
+  script:
+    - echo "Publica $DOCKER_IMAGE en el cluster cloud configurado."
+    - echo "Ejemplo esperado: actualizar servicio distribuido y recargar Caddy/ingress con SSL administrado."
