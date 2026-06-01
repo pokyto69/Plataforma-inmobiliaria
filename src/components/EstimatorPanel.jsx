@@ -23,6 +23,48 @@ export function EstimatorPanel({ selectedProperty, options }) {
   const [estimate, setEstimate] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [txMessage, setTxMessage] = useState('');
+  const [txError, setTxError] = useState('');
+
+  useEffect(() => {
+    setTxMessage('');
+    setTxError('');
+  }, [selectedProperty]);
+
+  const handleAcquire = () => {
+    setTxMessage('');
+    setTxError('');
+    const savedUser = localStorage.getItem('habitatIqUser');
+    if (!savedUser) {
+      setTxError('Inicia sesión en la pestaña "Mi Cuenta" para comprar o rentar.');
+      return;
+    }
+
+    const userObj = JSON.parse(savedUser);
+    const userTxKey = `tx_${userObj.username}`;
+    const currentTx = JSON.parse(localStorage.getItem(userTxKey) || '[]');
+    
+    if (currentTx.find(t => t.id === selectedProperty.id)) {
+      setTxError('Ya has adquirido esta propiedad.');
+      return;
+    }
+
+    const newTx = {
+      id: selectedProperty.id,
+      title: selectedProperty.title,
+      price: selectedProperty.price,
+      operation: selectedProperty.operation,
+      zone: selectedProperty.zone,
+      city: selectedProperty.city,
+      imageUrl: selectedProperty.imageUrl,
+      txDate: new Date().toISOString(),
+    };
+
+    currentTx.push(newTx);
+    localStorage.setItem(userTxKey, JSON.stringify(currentTx));
+    setTxMessage(`¡Felicidades! Has ${selectedProperty.operation === 'sale' ? 'comprado' : 'rentado'} esta propiedad.`);
+    window.dispatchEvent(new Event('habitatIqStorageUpdate'));
+  };
 
   useEffect(() => {
     if (!selectedProperty) return;
@@ -72,6 +114,25 @@ export function EstimatorPanel({ selectedProperty, options }) {
         <Calculator size={18} />
         <h2>Valuador</h2>
       </div>
+
+      {selectedProperty && (
+        <div className="selected-property-tx glass-panel" style={{ marginBottom: '20px', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255, 255, 255, 0.03)' }}>
+          <h3 style={{ fontSize: '1rem', marginBottom: '6px', color: '#fff', fontWeight: '600' }}>Adquirir Inmueble</h3>
+          <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '12px', lineHeight: '1.4' }}>
+            ¿Te interesa este inmueble? Puedes adquirirlo o rentarlo directamente.
+          </p>
+          <button 
+            type="button" 
+            onClick={handleAcquire} 
+            className="estimate-button" 
+            style={{ width: '100%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', height: '40px', fontSize: '0.9rem' }}
+          >
+            <span>{selectedProperty.operation === 'sale' ? 'Comprar Propiedad' : 'Rentar Propiedad'}</span>
+          </button>
+          {txMessage && <p className="success-message" style={{ marginTop: '10px', fontSize: '0.85rem', color: '#10b981' }}>{txMessage}</p>}
+          {txError && <p className="inline-alert" style={{ marginTop: '10px', fontSize: '0.85rem', color: '#f43f5e' }}>{txError}</p>}
+        </div>
+      )}
 
       <form onSubmit={submit}>
         <div className="field-group">

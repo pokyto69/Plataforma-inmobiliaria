@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, RefreshCw, ShieldCheck, UserRoundCheck, WalletCards } from 'lucide-react';
+import { Building2, RefreshCw, ShieldCheck, UserRoundCheck, WalletCards, User } from 'lucide-react';
 import { EstimatorPanel } from './components/EstimatorPanel.jsx';
 import { FilterPanel } from './components/FilterPanel.jsx';
 import { MapPanel } from './components/MapPanel.jsx';
 import { MarketStats } from './components/MarketStats.jsx';
 import { PropertyCard } from './components/PropertyCard.jsx';
 import { SellerProfile } from './components/SellerProfile.jsx';
+import { UserAccount } from './components/UserAccount.jsx';
 import { useProperties } from './hooks/useProperties.js';
 import { apiGet } from './lib/api.js';
 
@@ -30,6 +31,7 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
   const { properties, meta, loading, error } = useProperties(filters, refreshKey);
 
   const loadStats = () => {
@@ -131,13 +133,25 @@ function App() {
           <UserRoundCheck size={18} />
           <span>Vendedor</span>
         </button>
+        <button
+          type="button"
+          className={profile === 'account' ? 'active' : ''}
+          onClick={() => setProfile('account')}
+        >
+          <User size={18} />
+          <span>{currentUser ? `Cuenta (${currentUser.username})` : 'Mi Cuenta'}</span>
+        </button>
       </nav>
 
       <MarketStats stats={stats} />
 
-      {profile === 'seller' ? (
+      {profile === 'seller' && (
         <SellerProfile listings={ownerListings} onCreated={handlePropertyCreated} />
-      ) : (
+      )}
+      {profile === 'account' && (
+        <UserAccount onLoginChange={setCurrentUser} userProperties={properties} />
+      )}
+      {profile === 'buyer' && (
         <section className="workspace-grid">
           <FilterPanel
             filters={filters}

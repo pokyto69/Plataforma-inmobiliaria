@@ -1,7 +1,7 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 FROM deps AS build
 ARG VITE_GOOGLE_MAPS_API_KEY=""
@@ -14,7 +14,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY --chown=node:node server ./server
 USER node

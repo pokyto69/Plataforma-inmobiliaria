@@ -34,24 +34,7 @@ function loadGoogleMaps(apiKey) {
   return mapsPromise;
 }
 
-function getBounds(properties) {
-  const lats = properties.map((property) => property.lat);
-  const lngs = properties.map((property) => property.lng);
-  return {
-    minLat: Math.min(...lats),
-    maxLat: Math.max(...lats),
-    minLng: Math.min(...lngs),
-    maxLng: Math.max(...lngs),
-  };
-}
 
-function fallbackPosition(property, bounds) {
-  const latRange = Math.max(bounds.maxLat - bounds.minLat, 0.001);
-  const lngRange = Math.max(bounds.maxLng - bounds.minLng, 0.001);
-  const left = ((property.lng - bounds.minLng) / lngRange) * 82 + 8;
-  const top = (1 - (property.lat - bounds.minLat) / latRange) * 76 + 10;
-  return { left: `${left}%`, top: `${top}%` };
-}
 
 export function MapPanel({ properties, selectedId, onSelect }) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -60,7 +43,6 @@ export function MapPanel({ properties, selectedId, onSelect }) {
   const [mapsReady, setMapsReady] = useState(false);
   const [mapError, setMapError] = useState('');
   const selected = properties.find((property) => property.id === selectedId) || properties[0];
-  const bounds = useMemo(() => (properties.length ? getBounds(properties) : null), [properties]);
 
   useEffect(() => {
     if (!apiKey || !mapRef.current || !properties.length) return;
@@ -101,51 +83,20 @@ export function MapPanel({ properties, selectedId, onSelect }) {
     };
   }, [apiKey, onSelect, properties, selected]);
 
-  if (apiKey && !mapError) {
-    return (
-      <section className="map-panel">
-        <div className="map-title">
-          <Map size={18} />
-          <h2>Mapa</h2>
-          <span>{mapsReady ? 'Google Maps' : 'Cargando'}</span>
-        </div>
-        <div className="google-map" ref={mapRef} />
-      </section>
-    );
-  }
-
   return (
     <section className="map-panel">
       <div className="map-title">
         <Map size={18} />
         <h2>Mapa</h2>
-        <span>{mapError || 'Demo'}</span>
+        <span>{mapsReady ? 'Google Maps' : 'Cargando'}</span>
       </div>
-      <div className="fallback-map">
-        <div className="route-line horizontal" />
-        <div className="route-line vertical" />
-        <div className="route-line diagonal" />
-        {bounds
-          ? properties.map((property) => (
-              <button
-                key={property.id}
-                type="button"
-                className={`map-pin ${property.id === selectedId ? 'selected' : ''}`}
-                style={fallbackPosition(property, bounds)}
-                onClick={() => onSelect(property.id)}
-                title={property.title}
-              >
-                <Building size={15} />
-              </button>
-            ))
-          : null}
-        {selected ? (
-          <div className="map-callout">
-            <Navigation size={16} />
-            <strong>{selected.zone}</strong>
-            <span>{formatCurrency(selected.price, selected.operation)}</span>
+      <div className="google-map" ref={mapRef}>
+        {!apiKey && (
+          <div style={{ padding: '20px', color: '#fff', textAlign: 'center' }}>
+            <p>Se requiere una clave API de Google Maps.</p>
+            <p>Configura VITE_GOOGLE_MAPS_API_KEY en tu archivo .env.</p>
           </div>
-        ) : null}
+        )}
       </div>
     </section>
   );

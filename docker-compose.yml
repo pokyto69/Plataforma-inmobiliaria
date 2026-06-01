@@ -1,9 +1,22 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-habitatiq}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-habitatiq_secure_pass}
+      POSTGRES_DB: ${DB_NAME:-habitatiq_db}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./server/config/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
   app:
     build:
       context: .
       args:
         VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
+    depends_on:
+      - db
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -11,6 +24,7 @@ services:
       PARTNER_API_KEYS: ${PARTNER_API_KEYS:-demo-partner-key}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
       USER_PROPERTIES_PATH: /app/data/userProperties.json
+      DATABASE_URL: postgres://${DB_USER:-habitatiq}:${DB_PASSWORD:-habitatiq_secure_pass}@db:5432/${DB_NAME:-habitatiq_db}
     restart: unless-stopped
     expose:
       - "3000"
@@ -35,5 +49,6 @@ services:
 
 volumes:
   app_data:
+  pg_data:
   caddy_data:
   caddy_config:

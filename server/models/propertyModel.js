@@ -2,7 +2,10 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { properties } from '../data/properties.js';
+import { properties as seedProperties } from '../data/properties.js';
+import { isDbConnected, query } from '../config/db.js';
+
+let cachedProperties = null;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,8 +53,56 @@ function writeUserProperties(userProperties) {
   fs.writeFileSync(userPropertiesPath, `${JSON.stringify(userProperties, null, 2)}\n`, 'utf8');
 }
 
+export async function loadPropertiesToCache() {
+  if (isDbConnected()) {
+    try {
+      console.log('Cargando registros de PostgreSQL en el cache de memoria...');
+      const { rows } = await query('SELECT * FROM properties');
+      cachedProperties = rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        operation: row.operation,
+        type: row.type,
+        city: row.city,
+        zone: row.zone,
+        address: row.address,
+        price: Number(row.price),
+        currency: row.currency,
+        areaM2: Number(row.area_m2),
+        bedrooms: Number(row.bedrooms),
+        bathrooms: Number(row.bathrooms),
+        parking: Number(row.parking),
+        age: Number(row.age),
+        lat: Number(row.lat),
+        lng: Number(row.lng),
+        score: Number(row.score),
+        amenities: row.amenities || [],
+        features: row.features || [],
+        description: row.description,
+        imageUrl: row.image_url,
+        listedAt: row.listed_at,
+        owner: {
+          name: row.owner_name,
+          phone: row.owner_phone,
+          email: row.owner_email,
+        },
+        source: row.source,
+      }));
+      console.log(`Cache sincronizado con ${cachedProperties.length} propiedades.`);
+    } catch (err) {
+      console.error('Error cargando propiedades desde la BD, usando fallback local:', err);
+      cachedProperties = [...seedProperties, ...readUserProperties()];
+    }
+  } else {
+    cachedProperties = [...seedProperties, ...readUserProperties()];
+  }
+}
+
 export function getAllProperties() {
-  return [...properties, ...readUserProperties()];
+  if (!cachedProperties) {
+    cachedProperties = [...seedProperties, ...readUserProperties()];
+  }
+  return cachedProperties;
 }
 
 export function haversineKm(first, second) {
@@ -226,7 +277,54 @@ export function createProperty(payload) {
     source: 'user',
   };
 
-  userProperties.unshift(property);
-  writeUserProperties(userProperties);
+  if (!cachedProperties) {
+    cachedProperties = [...seedProperties, ...readUserProperties()];
+  }
+  cachedProperties.unshift(property);
+
+  if (isDbConnected()) {
+    query(`
+      INSERT INTO properties (
+        id, title, operation, type, city, zone, address, price, currency,
+        area_m2, bedrooms, bathrooms, parking, age, lat, lng, score,
+        amenities, features, description, image_url, listed_at,
+        owner_name, owner_phone, owner_email, source
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+    `, [
+      property.id,
+      property.title,
+      property.operation,
+      property.type,
+      property.city,
+      property.zone,
+      property.address,
+      property.price,
+      property.currency,
+      property.areaM2,
+      property.bedrooms,
+      property.bathrooms,
+      property.parking,
+      property.age,
+      property.lat,
+      property.lng,
+      property.score,
+      property.amenities,
+      property.features,
+      property.description,
+      property.imageUrl,
+      property.listedAt,
+      property.owner.name,
+      property.owner.phone,
+      property.owner.email,
+      property.source
+    ]).catch((err) => {
+      console.error('Error insertando propiedad en BD:', err);
+    });
+  } else {
+    const userProperties = readUserProperties();
+    userProperties.unshift(property);
+    writeUserProperties(userProperties);
+  }
+
   return property;
 }
