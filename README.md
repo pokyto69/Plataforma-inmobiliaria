@@ -9,7 +9,7 @@ Portal web para compra, venta y renta de propiedades con estimaciones automatica
 - Datos: catalogo semilla en memoria y algoritmo de valuacion basado en zona, m2, tipo, antiguedad y amenidades.
 - Perfiles: comprador para buscar inmuebles y vendedor para publicar casas/departamentos propios.
 - Seguridad: Helmet, CORS controlado, rate limiting, sanitizado XSS, cookie/token CSRF y API key para socios.
-- Mapas: Google Maps JavaScript API mediante `VITE_GOOGLE_MAPS_API_KEY`; incluye mapa demo si no hay llave.
+- Mapas: Leaflet interactivo con tiles de OpenStreetMap (sin requerir llaves API).
 - Despliegue: Docker multi-stage + Caddy como reverse proxy con SSL administrado.
 - Pruebas: unitarias del valuador, API smoke tests y rendimiento con carga concurrente nativa.
 
@@ -38,7 +38,6 @@ Variables principales:
 
 - `PARTNER_API_KEYS`: llaves validas para socios externos.
 - `CORS_ORIGINS`: origenes web autorizados.
-- `VITE_GOOGLE_MAPS_API_KEY`: llave publica para Google Maps en el frontend.
 - `USER_PROPERTIES_PATH`: archivo JSON donde se guardan publicaciones de usuarios.
 - `DOMAIN` y `ACME_EMAIL`: dominio y correo para SSL automatico con Caddy.
 
@@ -60,8 +59,7 @@ docker compose up --build
 
 Con `DOMAIN=tudominio.com`, Caddy solicita y renueva certificados TLS automaticamente.
 
-Para Google Maps real necesitas configurar `VITE_GOOGLE_MAPS_API_KEY` en `.env`.
-La guia paso a paso esta en [docs/google-maps-docker.md](docs/google-maps-docker.md).
+El mapa interactivo utiliza Leaflet y OpenStreetMap, por lo que no se requiere configurar ninguna clave API adicional.
 
 ## Web service para socios
 

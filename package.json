@@ -6,7 +6,7 @@
   "description": "Portal web inmobiliario con MVC, React, analisis de precios, seguridad, Docker y CI/CD.",
   "scripts": {
     "dev": "concurrently -n API,WEB -c cyan,green \"npm:dev:api\" \"npm:dev:web\"",
-    "dev:api": "node --watch server/server.js",
+    "dev:api": "node --watch --env-file=.env server/server.js",
     "dev:web": "vite --host 127.0.0.1",
     "build": "vite build",
     "start": "node server/server.js",

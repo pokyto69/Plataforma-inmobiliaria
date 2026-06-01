@@ -8,3 +8,6 @@ propertyRoutes.get('/', propertyController.list);
 propertyRoutes.get('/stats', propertyController.stats);
 propertyRoutes.post('/', csrfProtection, propertyController.create);
 propertyRoutes.get('/:id', propertyController.show);
+propertyRoutes.post('/:id/request', csrfProtection, propertyController.addRequest);
+propertyRoutes.post('/:id/confirm', csrfProtection, propertyController.confirmSale);
+propertyRoutes.post('/:id/cancel-request', csrfProtection, propertyController.cancelRequest);

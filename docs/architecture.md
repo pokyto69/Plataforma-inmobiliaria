@@ -33,4 +33,4 @@ flowchart LR
 
 ## Datos y valuacion
 
-El valuador toma zona, tipo, superficie, recamaras, banos, estacionamientos, antiguedad y amenidades. Calcula precio de venta por m2, ajusta por factores locales y deriva renta mensual con rendimiento por zona.
+El valuador toma zona, tipo, superficie, recamaras, Baños, estacionamientos, antiguedad y amenidades. Calcula precio de venta por m2, ajusta por factores locales y deriva renta mensual con rendimiento por zona.

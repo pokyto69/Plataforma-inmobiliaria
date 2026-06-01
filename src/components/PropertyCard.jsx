@@ -10,6 +10,11 @@ export function PropertyCard({ property, selected, onSelect }) {
           <div className="property-head">
             <div>
               <span className={`status ${property.operation}`}>{operationLabel(property.operation)}</span>
+              {property.status === 'pending' && (
+                <span className="status pending" style={{ background: '#d97706', color: '#fff', marginLeft: '6px' }}>
+                  En proceso de venta
+                </span>
+              )}
               <h3>{property.title}</h3>
             </div>
             <strong>{formatCurrency(property.price, property.operation)}</strong>

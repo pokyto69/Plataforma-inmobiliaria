@@ -4,6 +4,7 @@ import {
   getMarketStats,
   getPropertyById,
   listProperties,
+  updatePropertyStatusAndRequests,
 } from '../models/propertyModel.js';
 import { sanitizeText } from '../middleware/security.js';
 
@@ -72,4 +73,59 @@ export function create(req, res) {
   });
 
   res.status(201).json({ data: property });
+}
+
+export async function addRequest(req, res) {
+  const id = sanitizeText(req.params.id);
+  const property = getPropertyById(id);
+
+  if (!property) {
+    res.status(404).json({ error: 'Inmueble no encontrado.' });
+    return;
+  }
+
+  const { buyerName, buyerEmail, buyerPhone, message } = req.body || {};
+  if (!buyerName || !buyerEmail || !message) {
+    res.status(400).json({ error: 'Nombre, correo y mensaje son obligatorios.' });
+    return;
+  }
+
+  const newRequest = {
+    buyerName: sanitizeText(buyerName),
+    buyerEmail: sanitizeText(buyerEmail),
+    buyerPhone: sanitizeText(buyerPhone || ''),
+    message: sanitizeText(message),
+    date: new Date().toISOString(),
+  };
+
+  const requests = Array.isArray(property.requests) ? [...property.requests, newRequest] : [newRequest];
+  const updatedProperty = await updatePropertyStatusAndRequests(id, 'pending', requests);
+  res.json({ data: updatedProperty });
+}
+
+export async function confirmSale(req, res) {
+  const id = sanitizeText(req.params.id);
+  const property = getPropertyById(id);
+
+  if (!property) {
+    res.status(404).json({ error: 'Inmueble no encontrado.' });
+    return;
+  }
+
+  const requests = Array.isArray(property.requests) ? property.requests : [];
+  const updatedProperty = await updatePropertyStatusAndRequests(id, 'sold', requests);
+  res.json({ data: updatedProperty });
+}
+
+export async function cancelRequest(req, res) {
+  const id = sanitizeText(req.params.id);
+  const property = getPropertyById(id);
+
+  if (!property) {
+    res.status(404).json({ error: 'Inmueble no encontrado.' });
+    return;
+  }
+
+  const updatedProperty = await updatePropertyStatusAndRequests(id, 'available', []);
+  res.json({ data: updatedProperty });
 }

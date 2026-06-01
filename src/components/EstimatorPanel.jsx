@@ -18,7 +18,7 @@ const initialForm = {
 
 const amenityOptions = ['Terraza', 'Jardin', 'Alberca', 'Gimnasio', 'Vigilancia', 'Elevador', 'Coworking'];
 
-export function EstimatorPanel({ selectedProperty, options }) {
+export function EstimatorPanel({ selectedProperty, options, onRefresh }) {
   const [form, setForm] = useState(initialForm);
   const [estimate, setEstimate] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -26,44 +26,79 @@ export function EstimatorPanel({ selectedProperty, options }) {
   const [txMessage, setTxMessage] = useState('');
   const [txError, setTxError] = useState('');
 
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [buyerName, setBuyerName] = useState('');
+  const [buyerEmail, setBuyerEmail] = useState('');
+  const [buyerPhone, setBuyerPhone] = useState('');
+  const [buyerMessage, setBuyerMessage] = useState('');
+
   useEffect(() => {
     setTxMessage('');
     setTxError('');
+    setShowContactForm(false);
   }, [selectedProperty]);
 
-  const handleAcquire = () => {
+  const handleAcquireClick = () => {
     setTxMessage('');
     setTxError('');
     const savedUser = localStorage.getItem('habitatIqUser');
     if (!savedUser) {
-      setTxError('Inicia sesión en la pestaña "Mi Cuenta" para comprar o rentar.');
+      setTxError('Inicia sesión en la pestaña "Mi Cuenta" para adquirir o rentar.');
       return;
     }
 
     const userObj = JSON.parse(savedUser);
-    const userTxKey = `tx_${userObj.username}`;
-    const currentTx = JSON.parse(localStorage.getItem(userTxKey) || '[]');
-    
-    if (currentTx.find(t => t.id === selectedProperty.id)) {
-      setTxError('Ya has adquirido esta propiedad.');
-      return;
+    setBuyerName(userObj.username || '');
+    setBuyerEmail(userObj.email || '');
+    setBuyerPhone('');
+    setBuyerMessage(`Hola, estoy interesado en adquirir este inmueble. Por favor contáctame.`);
+    setShowContactForm(true);
+  };
+
+  const submitContactRequest = async (e) => {
+    e.preventDefault();
+    setTxMessage('');
+    setTxError('');
+
+    try {
+      const payload = {
+        buyerName,
+        buyerEmail,
+        buyerPhone,
+        message: buyerMessage,
+      };
+
+      await apiPost(`/api/properties/${selectedProperty.id}/request`, payload);
+
+      // Guardar también en localStorage del comprador para "Compras y Rentas"
+      const savedUser = localStorage.getItem('habitatIqUser');
+      if (savedUser) {
+        const userObj = JSON.parse(savedUser);
+        const userTxKey = `tx_${userObj.username}`;
+        const currentTx = JSON.parse(localStorage.getItem(userTxKey) || '[]');
+        
+        if (!currentTx.some(t => t.id === selectedProperty.id)) {
+          currentTx.push({
+            id: selectedProperty.id,
+            title: selectedProperty.title,
+            price: selectedProperty.price,
+            operation: selectedProperty.operation,
+            zone: selectedProperty.zone,
+            city: selectedProperty.city,
+            imageUrl: selectedProperty.imageUrl,
+            txDate: new Date().toISOString(),
+          });
+          localStorage.setItem(userTxKey, JSON.stringify(currentTx));
+        }
+      }
+
+      setTxMessage('¡Solicitud enviada! Inmueble marcado "En proceso de venta".');
+      setShowContactForm(false);
+      window.dispatchEvent(new Event('habitatIqStorageUpdate'));
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      setTxError(err.message);
     }
-
-    const newTx = {
-      id: selectedProperty.id,
-      title: selectedProperty.title,
-      price: selectedProperty.price,
-      operation: selectedProperty.operation,
-      zone: selectedProperty.zone,
-      city: selectedProperty.city,
-      imageUrl: selectedProperty.imageUrl,
-      txDate: new Date().toISOString(),
-    };
-
-    currentTx.push(newTx);
-    localStorage.setItem(userTxKey, JSON.stringify(currentTx));
-    setTxMessage(`¡Felicidades! Has ${selectedProperty.operation === 'sale' ? 'comprado' : 'rentado'} esta propiedad.`);
-    window.dispatchEvent(new Event('habitatIqStorageUpdate'));
   };
 
   useEffect(() => {
@@ -116,19 +151,69 @@ export function EstimatorPanel({ selectedProperty, options }) {
       </div>
 
       {selectedProperty && (
-        <div className="selected-property-tx glass-panel" style={{ marginBottom: '20px', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255, 255, 255, 0.03)' }}>
-          <h3 style={{ fontSize: '1rem', marginBottom: '6px', color: '#fff', fontWeight: '600' }}>Adquirir Inmueble</h3>
-          <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '12px', lineHeight: '1.4' }}>
-            ¿Te interesa este inmueble? Puedes adquirirlo o rentarlo directamente.
-          </p>
-          <button 
-            type="button" 
-            onClick={handleAcquire} 
-            className="estimate-button" 
-            style={{ width: '100%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', height: '40px', fontSize: '0.9rem' }}
-          >
-            <span>{selectedProperty.operation === 'sale' ? 'Comprar Propiedad' : 'Rentar Propiedad'}</span>
-          </button>
+        <div className="selected-property-tx glass-panel" style={{ marginBottom: '20px', padding: '15px', borderRadius: '12px', border: '1px solid var(--border-color)', background: 'var(--surface-soft)' }}>
+          <h3 style={{ fontSize: '1rem', marginBottom: '6px', color: 'var(--ink)', fontWeight: '600' }}>Adquirir Inmueble</h3>
+          
+          {selectedProperty.status === 'pending' ? (
+            <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '0', lineHeight: '1.4' }}>
+              Este inmueble se encuentra actualmente **En proceso de venta**. El vendedor está revisando las solicitudes.
+            </p>
+          ) : (
+            <>
+              {!showContactForm ? (
+                <>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '12px', lineHeight: '1.4' }}>
+                    ¿Te interesa este inmueble? Envía una solicitud directa al propietario para iniciar la adquisición.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleAcquireClick}
+                    className="estimate-button"
+                    style={{ width: '100%', background: 'var(--accent-gradient)', height: '40px', fontSize: '0.9rem' }}
+                  >
+                    <span>{selectedProperty.operation === 'sale' ? 'Comprar Propiedad' : 'Rentar Propiedad'}</span>
+                  </button>
+                </>
+              ) : (
+                <form onSubmit={submitContactRequest} style={{ display: 'grid', gap: '10px' }}>
+                  <label className="field" style={{ margin: 0 }}>
+                    <span style={{ fontSize: '10px' }}>Tu Nombre</span>
+                    <input value={buyerName} onChange={(e) => setBuyerName(e.target.value)} required style={{ minHeight: '32px' }} />
+                  </label>
+                  <label className="field" style={{ margin: 0 }}>
+                    <span style={{ fontSize: '10px' }}>Tu Correo</span>
+                    <input type="email" value={buyerEmail} onChange={(e) => setBuyerEmail(e.target.value)} required style={{ minHeight: '32px' }} />
+                  </label>
+                  <label className="field" style={{ margin: 0 }}>
+                    <span style={{ fontSize: '10px' }}>Tu Teléfono</span>
+                    <input value={buyerPhone} onChange={(e) => setBuyerPhone(e.target.value)} placeholder="Ej: 5512345678" style={{ minHeight: '32px' }} />
+                  </label>
+                  <label className="field" style={{ margin: 0 }}>
+                    <span style={{ fontSize: '10px' }}>Mensaje</span>
+                    <textarea value={buyerMessage} onChange={(e) => setBuyerMessage(e.target.value)} required style={{ minHeight: '60px', paddingTop: '6px' }} />
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <button
+                      type="submit"
+                      className="estimate-button"
+                      style={{ background: 'var(--green-gradient)', height: '36px', fontSize: '0.85rem' }}
+                    >
+                      <span>Enviar</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowContactForm(false)}
+                      className="icon-button neutral"
+                      style={{ height: '36px', fontSize: '0.85rem' }}
+                    >
+                      <span>Cancelar</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+            </>
+          )}
+
           {txMessage && <p className="success-message" style={{ marginTop: '10px', fontSize: '0.85rem', color: '#10b981' }}>{txMessage}</p>}
           {txError && <p className="inline-alert" style={{ marginTop: '10px', fontSize: '0.85rem', color: '#f43f5e' }}>{txError}</p>}
         </div>
@@ -202,7 +287,7 @@ export function EstimatorPanel({ selectedProperty, options }) {
 
         <div className="field-row three">
           <label className="field">
-            <span>Rec.</span>
+            <span>Recamaras</span>
             <input
               type="number"
               min="0"
@@ -212,7 +297,7 @@ export function EstimatorPanel({ selectedProperty, options }) {
             />
           </label>
           <label className="field">
-            <span>Banos</span>
+            <span>Baños</span>
             <input
               type="number"
               min="1"

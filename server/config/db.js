@@ -35,7 +35,7 @@ export const isDbConnected = () => {
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const initDb = async (retries = 8, delayMs = 2500) => {
+export const initDb = async (retries = process.env.NODE_ENV === 'production' ? 8 : 1, delayMs = 1000) => {
   if (!pool) {
     console.log('No database connection configured (DATABASE_URL missing).');
     return;
@@ -54,13 +54,17 @@ export const initDb = async (retries = 8, delayMs = 2500) => {
         client.release();
       }
     } catch (err) {
-      console.warn(`Attempt ${i + 1}/${retries} to connect to database failed: ${err.message}`);
-      if (i < retries - 1) {
-        console.log(`Waiting ${delayMs}ms before retrying...`);
-        await delay(delayMs);
+      if (process.env.NODE_ENV === 'production') {
+        console.warn(`Attempt ${i + 1}/${retries} to connect to database failed: ${err.message}`);
+        if (i < retries - 1) {
+          console.log(`Waiting ${delayMs}ms before retrying...`);
+          await delay(delayMs);
+        } else {
+          console.error('All database connection attempts failed.');
+          throw err;
+        }
       } else {
-        console.error('All database connection attempts failed.');
-        throw err;
+        throw new Error('Conexión rechazada en localhost:5432 (Docker DB no iniciada)');
       }
     }
   }

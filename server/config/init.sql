@@ -24,8 +24,13 @@ CREATE TABLE IF NOT EXISTS properties (
   owner_name VARCHAR(255) DEFAULT 'Propietario',
   owner_phone VARCHAR(50),
   owner_email VARCHAR(255),
-  source VARCHAR(50) DEFAULT 'user'
+  source VARCHAR(50) DEFAULT 'user',
+  status VARCHAR(50) DEFAULT 'available',
+  requests TEXT DEFAULT '[]'
 );
+
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'available';
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS requests TEXT DEFAULT '[]';
 
 INSERT INTO properties (
   id, title, operation, type, city, zone, address, price, currency,

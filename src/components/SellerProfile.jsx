@@ -28,7 +28,7 @@ const initialListing = {
 
 const amenityOptions = ['Terraza', 'Jardin', 'Alberca', 'Gimnasio', 'Vigilancia', 'Elevador', 'Bodega', 'Paneles solares'];
 
-export function SellerProfile({ listings, onCreated }) {
+export function SellerProfile({ listings, onCreated, onRefresh }) {
   const [form, setForm] = useState(initialListing);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -82,6 +82,24 @@ export function SellerProfile({ listings, onCreated }) {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleConfirm = async (id) => {
+    try {
+      await apiPost(`/api/properties/${id}/confirm`);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
+  };
+
+  const handleCancelRequest = async (id) => {
+    try {
+      await apiPost(`/api/properties/${id}/cancel-request`);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert(`Error: ${err.message}`);
     }
   };
 
@@ -156,11 +174,11 @@ export function SellerProfile({ listings, onCreated }) {
             <input type="number" min="15" value={form.areaM2} onChange={(event) => update('areaM2', event.target.value)} required />
           </label>
           <label className="field">
-            <span>Rec.</span>
+            <span>Recamaras</span>
             <input type="number" min="0" value={form.bedrooms} onChange={(event) => update('bedrooms', event.target.value)} />
           </label>
           <label className="field">
-            <span>Banos</span>
+            <span>Baños</span>
             <input type="number" min="1" value={form.bathrooms} onChange={(event) => update('bathrooms', event.target.value)} />
           </label>
         </div>
@@ -191,10 +209,39 @@ export function SellerProfile({ listings, onCreated }) {
           </label>
         </div>
 
-        <label className="field">
-          <span>Foto URL</span>
-          <input value={form.imageUrl} onChange={(event) => update('imageUrl', event.target.value)} />
-        </label>
+        <div className="field">
+          <span>Foto del Inmueble</span>
+          <div style={{ display: 'grid', gap: '8px' }}>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  update('imageUrl', event.target.result);
+                };
+                reader.readAsDataURL(file);
+              }}
+              style={{ border: 'none', padding: '0', background: 'transparent', height: 'auto' }}
+            />
+            {form.imageUrl && (
+              <div style={{ position: 'relative', width: '100%', height: '120px', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--line)' }}>
+                <img src={form.imageUrl} alt="Vista previa" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <button
+                  type="button"
+                  onClick={() => update('imageUrl', '')}
+                  style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', cursor: 'pointer' }}
+                >
+                  Quitar
+                </button>
+              </div>
+            )}
+            <span style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'none' }}>O introduce una URL de imagen externa:</span>
+            <input value={form.imageUrl} onChange={(event) => update('imageUrl', event.target.value)} placeholder="https://images.unsplash.com/..." />
+          </div>
+        </div>
 
         <label className="field">
           <span>Descripcion</span>
@@ -248,15 +295,65 @@ export function SellerProfile({ listings, onCreated }) {
         <div className="owner-list">
           {listings.length ? (
             listings.map((property) => (
-              <article className="owner-card" key={property.id}>
-                <img src={property.imageUrl} alt={property.title} />
-                <div>
-                  <span>{operationLabel(property.operation)}</span>
-                  <h3>{property.title}</h3>
-                  <strong>{formatCurrency(property.price, property.operation)}</strong>
-                  <small>
-                    {property.zone}, {property.city}
-                  </small>
+              <article className="owner-card" key={property.id} style={{ display: 'flex', flexDirection: 'column', height: 'auto', minHeight: 'auto' }}>
+                <img src={property.imageUrl} alt={property.title} style={{ height: '140px', objectFit: 'cover' }} />
+                <div style={{ padding: '14px', flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className={`status ${property.operation}`}>{operationLabel(property.operation)}</span>
+                      {property.status === 'pending' && (
+                        <span className="status pending" style={{ background: '#d97706', color: '#fff', fontSize: '9px', padding: '2px 6px', borderRadius: '4px', textTransform: 'none' }}>
+                          Venta en proceso
+                        </span>
+                      )}
+                      {property.status === 'sold' && (
+                        <span className="status sold" style={{ background: '#64748b', color: '#fff', fontSize: '9px', padding: '2px 6px', borderRadius: '4px', textTransform: 'none' }}>
+                          Vendido
+                        </span>
+                      )}
+                    </div>
+                    <h3 style={{ margin: '8px 0 4px', fontSize: '15px' }}>{property.title}</h3>
+                    <strong style={{ display: 'block', fontSize: '16px', color: 'var(--blue)', marginBottom: '4px' }}>
+                      {formatCurrency(property.price, property.operation)}
+                    </strong>
+                    <small style={{ color: 'var(--muted)', display: 'block', marginBottom: '8px' }}>
+                      {property.zone}, {property.city}
+                    </small>
+                  </div>
+
+                  {property.requests && property.requests.length > 0 && (
+                    <div style={{ borderTop: '1px solid var(--line)', marginTop: '12px', paddingTop: '12px' }}>
+                      <h4 style={{ fontSize: '12px', margin: '0 0 8px', color: 'var(--ink)', fontWeight: '600' }}>Solicitudes de adquisición:</h4>
+                      <div style={{ display: 'grid', gap: '8px' }}>
+                        {property.requests.map((req, idx) => (
+                          <div key={idx} style={{ background: 'var(--surface-hover)', padding: '8px', borderRadius: '6px', fontSize: '11px', border: '1px solid var(--line)' }}>
+                            <div style={{ fontWeight: '600', color: 'var(--ink)' }}>{req.buyerName}</div>
+                            <div style={{ color: 'var(--muted)', margin: '2px 0' }}>Tel: {req.buyerPhone || 'N/A'} | Correo: {req.buyerEmail}</div>
+                            <p style={{ margin: '4px 0 0', fontStyle: 'italic', color: '#475569' }}>"{req.message}"</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {property.status === 'pending' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleConfirm(property.id)}
+                        style={{ height: '32px', background: 'var(--jade)', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                      >
+                        Confirmar Venta
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCancelRequest(property.id)}
+                        style={{ height: '32px', background: '#fff1f2', color: '#be123c', border: '1px solid #fecdd3', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  )}
                 </div>
               </article>
             ))

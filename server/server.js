@@ -15,7 +15,7 @@ initDb()
     });
   })
   .catch((err) => {
-    console.error('Fallo al iniciar base de datos:', err);
+    console.warn(`Aviso de Base de Datos: ${err.message}`);
     loadPropertiesToCache().finally(() => {
       app.listen(port, () => {
         console.log(`HabitatIQ API escuchando en http://127.0.0.1:${port} (sin BD)`);

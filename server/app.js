@@ -63,6 +63,14 @@ export function createApp() {
     }),
   );
 
+  const uploadsPath = process.env.USER_PROPERTIES_PATH
+    ? path.join(path.dirname(path.resolve(process.env.USER_PROPERTIES_PATH)), 'uploads')
+    : path.resolve(__dirname, 'data/uploads');
+  if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath, { recursive: true });
+  }
+  app.use('/api/uploads', express.static(uploadsPath));
+
   app.use('/api', apiLimiter, apiRoutes);
 
   if (fs.existsSync(distPath)) {

@@ -33,6 +33,10 @@ function App() {
   const [locationError, setLocationError] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const { properties, meta, loading, error } = useProperties(filters, refreshKey);
+  const buyerProperties = useMemo(
+    () => properties.filter((property) => property.status !== 'sold'),
+    [properties],
+  );
 
   const loadStats = () => {
     apiGet('/api/properties/stats')
@@ -45,14 +49,14 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (properties.length && !properties.some((property) => property.id === selectedId)) {
-      setSelectedId(properties[0].id);
+    if (buyerProperties.length && !buyerProperties.some((property) => property.id === selectedId)) {
+      setSelectedId(buyerProperties[0].id);
     }
-  }, [properties, selectedId]);
+  }, [buyerProperties, selectedId]);
 
   const selectedProperty = useMemo(
-    () => properties.find((property) => property.id === selectedId) || properties[0],
-    [properties, selectedId],
+    () => buyerProperties.find((property) => property.id === selectedId) || buyerProperties[0],
+    [buyerProperties, selectedId],
   );
 
   const locate = () => {
@@ -146,7 +150,11 @@ function App() {
       <MarketStats stats={stats} />
 
       {profile === 'seller' && (
-        <SellerProfile listings={ownerListings} onCreated={handlePropertyCreated} />
+        <SellerProfile 
+          listings={ownerListings} 
+          onCreated={handlePropertyCreated} 
+          onRefresh={() => setRefreshKey((current) => current + 1)}
+        />
       )}
       {profile === 'account' && (
         <UserAccount onLoginChange={setCurrentUser} userProperties={properties} />
@@ -167,7 +175,7 @@ function App() {
             <div className="results-head">
               <div>
                 <h2>Inmuebles</h2>
-                <span>{meta.total} disponibles</span>
+                <span>{buyerProperties.length} disponibles</span>
               </div>
               {loading ? (
                 <span className="loading-chip">
@@ -180,7 +188,7 @@ function App() {
             {error ? <p className="inline-alert">{error}</p> : null}
 
             <div className="property-list">
-              {properties.map((property) => (
+              {buyerProperties.map((property) => (
                 <PropertyCard
                   key={property.id}
                   property={property}
@@ -188,13 +196,13 @@ function App() {
                   onSelect={setSelectedId}
                 />
               ))}
-              {!loading && !properties.length ? <div className="empty-list">Sin resultados</div> : null}
+              {!loading && !buyerProperties.length ? <div className="empty-list">Sin resultados</div> : null}
             </div>
           </section>
 
           <section className="insights-pane">
-            <MapPanel properties={properties} selectedId={selectedId} onSelect={setSelectedId} />
-            <EstimatorPanel selectedProperty={selectedProperty} options={meta.options} />
+            <MapPanel properties={buyerProperties} selectedId={selectedId} onSelect={setSelectedId} />
+            <EstimatorPanel selectedProperty={selectedProperty} options={meta.options} onRefresh={() => setRefreshKey((current) => current + 1)} />
           </section>
         </section>
       )}

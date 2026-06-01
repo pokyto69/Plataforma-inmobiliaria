@@ -53,6 +53,29 @@ function writeUserProperties(userProperties) {
   fs.writeFileSync(userPropertiesPath, `${JSON.stringify(userProperties, null, 2)}\n`, 'utf8');
 }
 
+function saveBase64Image(base64Str) {
+  if (!base64Str || !base64Str.startsWith('data:image/')) {
+    return base64Str;
+  }
+  try {
+    const matches = base64Str.match(/^data:image\/([A-Za-z0-9-+]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return base64Str;
+    }
+    const ext = matches[1];
+    const dataBuffer = Buffer.from(matches[2], 'base64');
+    const filename = `property-${crypto.randomUUID()}.${ext}`;
+    const uploadsDir = path.join(path.dirname(userPropertiesPath), 'uploads');
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    const filePath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filePath, dataBuffer);
+    return `/api/uploads/${filename}`;
+  } catch (err) {
+    console.error('Error al guardar la imagen base64:', err);
+    return base64Str;
+  }
+}
+
 export async function loadPropertiesToCache() {
   if (isDbConnected()) {
     try {
@@ -87,6 +110,8 @@ export async function loadPropertiesToCache() {
           email: row.owner_email,
         },
         source: row.source,
+        status: row.status || 'available',
+        requests: JSON.parse(row.requests || '[]'),
       }));
       console.log(`Cache sincronizado con ${cachedProperties.length} propiedades.`);
     } catch (err) {
@@ -267,7 +292,7 @@ export function createProperty(payload) {
     amenities: Array.isArray(payload.amenities) ? payload.amenities.slice(0, 8).map((item) => cleanText(item)).filter(Boolean) : [],
     features: ['Publicado por propietario', 'Contacto directo'],
     description: cleanText(payload.description, 'Inmueble publicado por un usuario de HabitatIQ.'),
-    imageUrl: cleanText(payload.imageUrl, defaultImageUrl),
+    imageUrl: saveBase64Image(cleanText(payload.imageUrl, defaultImageUrl)),
     listedAt: new Date().toISOString().slice(0, 10),
     owner: {
       name: cleanText(payload.ownerName, 'Propietario'),
@@ -275,6 +300,8 @@ export function createProperty(payload) {
       email: cleanText(payload.ownerEmail),
     },
     source: 'user',
+    status: 'available',
+    requests: [],
   };
 
   if (!cachedProperties) {
@@ -288,8 +315,8 @@ export function createProperty(payload) {
         id, title, operation, type, city, zone, address, price, currency,
         area_m2, bedrooms, bathrooms, parking, age, lat, lng, score,
         amenities, features, description, image_url, listed_at,
-        owner_name, owner_phone, owner_email, source
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        owner_name, owner_phone, owner_email, source, status, requests
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
     `, [
       property.id,
       property.title,
@@ -316,7 +343,9 @@ export function createProperty(payload) {
       property.owner.name,
       property.owner.phone,
       property.owner.email,
-      property.source
+      property.source,
+      property.status,
+      JSON.stringify(property.requests),
     ]).catch((err) => {
       console.error('Error insertando propiedad en BD:', err);
     });
@@ -324,6 +353,35 @@ export function createProperty(payload) {
     const userProperties = readUserProperties();
     userProperties.unshift(property);
     writeUserProperties(userProperties);
+  }
+
+  return property;
+}
+
+export async function updatePropertyStatusAndRequests(id, status, requests) {
+  const property = getPropertyById(id);
+  if (!property) return null;
+
+  property.status = status;
+  property.requests = requests;
+
+  if (isDbConnected()) {
+    try {
+      await query(
+        'UPDATE properties SET status = $1, requests = $2 WHERE id = $3',
+        [status, JSON.stringify(requests), id]
+      );
+    } catch (err) {
+      console.error('Error actualizando propiedad en BD:', err);
+    }
+  } else {
+    const userProperties = readUserProperties();
+    const index = userProperties.findIndex((p) => p.id === id);
+    if (index !== -1) {
+      userProperties[index].status = status;
+      userProperties[index].requests = requests;
+      writeUserProperties(userProperties);
+    }
   }
 
   return property;
